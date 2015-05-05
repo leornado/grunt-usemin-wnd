@@ -12,6 +12,37 @@ Fix usemin. Replace revved file in same directory as first priority.
     |_t.png -> abcdef.t.png
 ```
 
+Add 5th array element(function) to process replace result.
+also see * [`grunt-cmd-transport-wnd`](https://www.npmjs.com/package/grunt-cmd-transport-wnd)
+
+```js
+...
+usemin: { // from grunt-usemin-wnd
+  options: {
+    assetsDirs       : [
+      '<%= config.dist %>/console/*',
+      '<%= config.dist %>/console',
+      '<%= config.dist %>'
+    ],
+    patterns         : {
+      js: [
+        [
+          /['"]usemin:([^'"]*)["']/gm,
+          'Replacing seajs require parts',
+          function (m) { // add ext '.js'
+            return path.extname(m) == '.js' ? m : m + '.js';
+          }, ,
+          function (m) { // cut prefix 'usemin:'
+            return m.replace(/usemin:/, '');
+          }
+        ]
+      ]
+    }
+  },
+  js     : ['<%= config.dist %>/*/js/*.js']
+}
+...
+```
 
 # grunt-usemin [![Linux Build Status](https://img.shields.io/travis/yeoman/grunt-usemin/master.svg?style=flat&label=Linux%20build)](https://travis-ci.org/yeoman/grunt-usemin) [![Windows Build status](https://img.shields.io/appveyor/ci/addyosmani/grunt-usemin/master.svg?style=flat&label=Windows%20build)](https://ci.appveyor.com/project/addyosmani/grunt-usemin/branch/master)
 [![Gitter](https://img.shields.io/badge/GITTER-join%20chat-green.svg)](https://gitter.im/yeoman/grunt-usemin)
