@@ -1,3 +1,18 @@
+# grunt-usemin-wnd
+> Modified from grunt-usemin 4 personal use.
+
+Fix usemin. Replace revved file in same directory as first priority.
+
+```shell
+|_dir1
+    |_a.css -> replace with 123456.t.png
+    |_t.png -> 123456.t.png
+|_dir2
+    |_b.css -> replace with abcdef.t.png
+    |_t.png -> abcdef.t.png
+```
+
+
 # grunt-usemin [![Linux Build Status](https://img.shields.io/travis/yeoman/grunt-usemin/master.svg?style=flat&label=Linux%20build)](https://travis-ci.org/yeoman/grunt-usemin) [![Windows Build status](https://img.shields.io/appveyor/ci/addyosmani/grunt-usemin/master.svg?style=flat&label=Windows%20build)](https://ci.appveyor.com/project/addyosmani/grunt-usemin/branch/master)
 [![Gitter](https://img.shields.io/badge/GITTER-join%20chat-green.svg)](https://gitter.im/yeoman/grunt-usemin)
 
