@@ -3,32 +3,32 @@
   <head>
     <meta charset='utf-8'>
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+
     <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
     <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen">
     <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
-
-    <!--[if lt IE 9]>
-    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
 
     <title>Grunt-usemin-wnd by leornado</title>
   </head>
 
   <body>
+
     <header>
-      <div class="inner">
+      <div class="container">
         <h1>Grunt-usemin-wnd</h1>
         <h2></h2>
-        <a href="https://github.com/leornado/grunt-usemin-wnd" class="button"><small>View project on</small> GitHub</a>
+
+        <section id="downloads">
+          <a href="https://github.com/leornado/grunt-usemin-wnd/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/leornado/grunt-usemin-wnd/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/leornado/grunt-usemin-wnd" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
       </div>
     </header>
 
-    <div id="content-wrapper">
-      <div class="inner clearfix">
-        <section id="main-content">
-          <h1>
+    <div class="container">
+      <section id="main_content">
+        <h1>
 <a id="grunt-usemin-wnd" class="anchor" href="#grunt-usemin-wnd" aria-hidden="true"><span class="octicon octicon-link"></span></a>grunt-usemin-wnd</h1>
 
 <blockquote>
@@ -43,6 +43,36 @@
 <span class="pl-k">|</span>_dir2
     <span class="pl-k">|</span>_b.css -<span class="pl-k">&gt;</span> replace with abcdef.t.png
     <span class="pl-k">|</span>_t.png -<span class="pl-k">&gt;</span> abcdef.t.png</pre></div>
+
+<p>Add 5th array element(function) to process replace result.
+also see * <a href="https://www.npmjs.com/package/grunt-cmd-transport-wnd"><code>grunt-cmd-transport-wnd</code></a></p>
+
+<div class="highlight highlight-js"><pre>...
+usemin<span class="pl-k">:</span> { <span class="pl-c">// from grunt-usemin-wnd</span>
+  options<span class="pl-k">:</span> {
+    assetsDirs       <span class="pl-k">:</span> [
+      <span class="pl-s"><span class="pl-pds">'</span>&lt;%= config.dist %&gt;/console/*<span class="pl-pds">'</span></span>,
+      <span class="pl-s"><span class="pl-pds">'</span>&lt;%= config.dist %&gt;/console<span class="pl-pds">'</span></span>,
+      <span class="pl-s"><span class="pl-pds">'</span>&lt;%= config.dist %&gt;<span class="pl-pds">'</span></span>
+    ],
+    patterns         <span class="pl-k">:</span> {
+      js<span class="pl-k">:</span> [
+        [
+<span class="pl-sr">          <span class="pl-pds">/</span><span class="pl-c1">['"]</span>usemin:(<span class="pl-c1">[<span class="pl-k">^</span>'"]</span><span class="pl-k">*</span>)<span class="pl-c1">["']</span><span class="pl-pds">/</span>gm</span>,
+          <span class="pl-s"><span class="pl-pds">'</span>Replacing seajs require parts<span class="pl-pds">'</span></span>,
+          <span class="pl-k">function</span> (<span class="pl-smi">m</span>) { <span class="pl-c">// add ext '.js'</span>
+            <span class="pl-k">return</span> path.extname(m) <span class="pl-k">==</span> <span class="pl-s"><span class="pl-pds">'</span>.js<span class="pl-pds">'</span></span> <span class="pl-k">?</span> m <span class="pl-k">:</span> m <span class="pl-k">+</span> <span class="pl-s"><span class="pl-pds">'</span>.js<span class="pl-pds">'</span></span>;
+          }, ,
+          <span class="pl-k">function</span> (<span class="pl-smi">m</span>) { <span class="pl-c">// cut prefix 'usemin:'</span>
+            <span class="pl-k">return</span> m.<span class="pl-c1">replace</span>(<span class="pl-sr"><span class="pl-pds">/</span>usemin:<span class="pl-pds">/</span></span>, <span class="pl-s"><span class="pl-pds">'</span><span class="pl-pds">'</span></span>);
+          }
+        ]
+      ]
+    }
+  },
+  js     <span class="pl-k">:</span> [<span class="pl-s"><span class="pl-pds">'</span>&lt;%= config.dist %&gt;/*/js/*.js<span class="pl-pds">'</span></span>]
+}
+...</pre></div>
 
 <h1>
 <a id="grunt-usemin--" class="anchor" href="#grunt-usemin--" aria-hidden="true"><span class="octicon octicon-link"></span></a>grunt-usemin <a href="https://travis-ci.org/yeoman/grunt-usemin"><img src="https://img.shields.io/travis/yeoman/grunt-usemin/master.svg?style=flat&amp;label=Linux%20build" alt="Linux Build Status"></a> <a href="https://ci.appveyor.com/project/addyosmani/grunt-usemin/branch/master"><img src="https://img.shields.io/appveyor/ci/addyosmani/grunt-usemin/master.svg?style=flat&amp;label=Windows%20build" alt="Windows Build status"></a>
@@ -719,25 +749,9 @@ will be in <code>dist/bar</code>, and <code>usemin</code> will look for <code>di
 <a id="license" class="anchor" href="#license" aria-hidden="true"><span class="octicon octicon-link"></span></a>License</h2>
 
 <p><a href="http://opensource.org/licenses/bsd-license.php">BSD license</a> and copyright Google</p>
-        </section>
-
-        <aside id="sidebar">
-          <a href="https://github.com/leornado/grunt-usemin-wnd/zipball/master" class="button">
-            <small>Download</small>
-            .zip file
-          </a>
-          <a href="https://github.com/leornado/grunt-usemin-wnd/tarball/master" class="button">
-            <small>Download</small>
-            .tar.gz file
-          </a>
-
-          <p class="repo-owner"><a href="https://github.com/leornado/grunt-usemin-wnd"></a> is maintained by <a href="https://github.com/leornado">leornado</a>.</p>
-
-          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
-        </aside>
-      </div>
+      </section>
     </div>
 
-  
+    
   </body>
 </html>
