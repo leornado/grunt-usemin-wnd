@@ -1,6 +1,9 @@
 'use strict';
 var util = require('util');
 var chalk = require('chalk');
+var crypto = require('crypto');
+var fs = require('fs');
+var path = require('path');
 
 // Retrieve the flow config from the furnished configuration. It can be:
 //  - a dedicated one for the furnished target
@@ -10,10 +13,10 @@ var getFlowFromConfig = function (config, target) {
   var Flow = require('../lib/flow');
   var flow = new Flow({
     steps: {
-      js: ['concat', 'uglify'],
+      js : ['concat', 'uglify'],
       css: ['concat', 'cssmin']
     },
-    post: {}
+    post : {}
   });
   if (config.options && config.options.flow) {
     if (config.options.flow[target]) {
@@ -103,52 +106,246 @@ module.exports = function (grunt) {
   var ConfigWriter = require('../lib/configwriter');
   var _ = require('lodash');
 
+  function md5(filepath, algorithm, encoding) {
+    var hash = crypto.createHash(algorithm);
+    grunt.log.verbose.write('Hashing ' + filepath + '...');
+    hash.update(grunt.file.read(filepath));
+    return hash.digest(encoding);
+  }
+
+  var revFile = function (fileName) {
+    var hash = md5(fileName, 'md5', 'hex'),
+      prefix = hash.slice(0, 8),
+      renamed = [prefix, path.basename(fileName)].join('.'),
+      outPath = path.resolve(path.dirname(fileName), renamed);
+
+    grunt.verbose.ok().ok(hash);
+    fs.renameSync(fileName, outPath);
+
+    grunt.log.write(fileName + ' ').ok(renamed);
+    return path.dirname(fileName) + "/" + renamed;
+  };
+
   grunt.registerMultiTask('usemin', 'Replaces references to non-minified scripts / stylesheets', function () {
     var debug = require('debug')('usemin:usemin');
-    var options = this.options({
-      type: this.target
+    var opts = {}, handlers = {}, revFileMap = {}, revs = this.options()['rev'];
+
+    var revFiles = grunt.file.expand({
+      nonull: true,
+      filter: 'isFile'
+    }, revs);
+    revFiles.forEach(function (revFile) {
+      revFileMap[revFile] = {revved: false};
     });
-    var blockReplacements = options.blockReplacements || {};
 
-    debug('Looking at %s target', this.target);
-    var patterns = [];
-    var type = this.target;
+    var getHandler = function (target) {
+      var options = opts[target] = this.options({
+        type: target
+      });
+      var blockReplacements = options.blockReplacements || {};
 
-    // Check if we have a user defined pattern
-    if (options.patterns && options.patterns[this.target]) {
-      debug('Adding user defined patterns for %s', this.target);
-      patterns = options.patterns[this.target];
-    }
+      debug('Looking at %s target', target);
+      var patterns = [];
+      var type = target;
 
-    // var locator = options.revmap ? grunt.file.readJSON(options.revmap) : function (p) { return grunt.file.expand({filter: 'isFile'}, p); };
-    var locator = getLocator(grunt, options);
-    var revvedfinder = new RevvedFinder(locator);
-    var handler = new FileProcessor(type, patterns, revvedfinder, function (msg) {
-      grunt.verbose.writeln(msg);
-    }, blockReplacements);
+      // Check if we have a user defined pattern
+      if (options.patterns && options.patterns[target]) {
+        debug('Adding user defined patterns for %s', target);
+        patterns = options.patterns[target];
+      }
 
-    this.files.forEach(function (fileObj) {
-      var files = grunt.file.expand({
-        nonull: true,
-        filter: 'isFile'
-      }, fileObj.src);
-      files.forEach(function (filename) {
-        debug('looking at file %s', filename);
+      // var locator = options.revmap ? grunt.file.readJSON(options.revmap) : function (p) { return grunt.file.expand({filter: 'isFile'}, p); };
+      var locator = getLocator(grunt, options);
+      var revvedfinder = new RevvedFinder(locator);
+      var handler = new FileProcessor(type, patterns, revvedfinder, function (msg) {
+        grunt.verbose.writeln(msg);
+      }, blockReplacements);
+      handlers[type] = handler;
+      ext2type[type] = type;
+    };
 
-        grunt.verbose.writeln(chalk.bold('Processing as ' + options.type.toUpperCase() + ' - ') + chalk.cyan(filename));
+    var replaceFile = function (filename) {
+      var suffix = filename.substr(filename.lastIndexOf('.') + 1);
+      var type = ext2type[suffix];
+      if (!type) {
+        grunt.log.subhead('Skip to replace revved-file in file ' + filename);
+        return;
+      }
+      var options = opts[type];
+      debug('looking at file %s', filename);
 
-        // Our revved version locator
-        var content = handler.process(filename, options.assetsDirs);
+      grunt.verbose.writeln(chalk.bold('Processing as ' + options.type.toUpperCase() + ' - ') + chalk.cyan(filename));
 
-        // write the new content to disk
-        grunt.file.write(filename, content);
+      // Our revved version locator
+      var content = handlers[type].process(filename, options.assetsDirs);
 
+      // write the new content to disk
+      grunt.file.write(filename, content);
+    };
+
+    var target = this.target, defOpts = this.options(), ext2type = defOpts.ext2type || {};
+    if (target == 'files') {
+      var dependencies = {};
+      for (var type in this.data) {
+        getHandler.apply(this, [type]);
+        var typeFiles = this.data[type];
+
+        for (var fileIndex in typeFiles) {
+          var files = grunt.file.expand({
+            nonull: true,
+            filter: 'isFile'
+          }, typeFiles[fileIndex]);
+          files.forEach(function (filename) {
+            var suffix = filename.substr(filename.lastIndexOf('.') + 1);
+            var type = ext2type[suffix] || suffix;
+            var options = opts[type];
+            debug('looking at file %s', filename);
+
+            grunt.verbose.writeln(chalk.bold('Processing as ' + options.type.toUpperCase() + ' - ') + chalk.cyan(filename));
+
+            // Our revved version locator
+            var fileDeps = handlers[type].scanDependencies(filename, options.assetsDirs);
+            dependencies[filename] = fileDeps;
+          });
+        }
+      }
+      var fileMap = {};
+      for (var fk in dependencies) {
+        var mapFile = fileMap[fk];
+        if (!mapFile) mapFile = fileMap[fk] = {level: 0};
+        var fdeps = dependencies[fk];
+        if (!fdeps) continue;
+
+        for (var fr in fdeps) {
+          var fdep = fdeps[fr];
+          if (fdep && !fdep.src) continue;
+
+          if (fr == fk) {
+            mapFile.src = fdep.src;
+            continue;
+          }
+
+          var maprFile = fileMap[fr];
+          if (!maprFile) maprFile = fileMap[fr] = {src: fdep.src, level: 0};
+          else maprFile.src = fdep.src;
+          if (!mapFile.deps)  mapFile.deps = {};
+          mapFile.deps[fr] = maprFile;
+        }
+      }
+
+      var scanned = {};
+      var scan = function (file, scannedFiles, level) {
+        var prefix = '';
+        for (var fi = 0; fi < level; fi++)
+          prefix += '  ';
+        for (var fk in file.deps) {
+          var mapFile = fileMap[fk], scannedFile = scannedFiles[fk];
+          if (!scannedFile) {
+            scannedFile = scannedFiles[fk] = {src: mapFile.src, level: level};
+          } else {
+            scannedFile.level = level;
+            scannedFile.src = mapFile.src;
+          }
+
+          if (mapFile.deps) {
+            scan(mapFile, scannedFiles, level + 1);
+          }
+        }
+      };
+      for (var fk in fileMap) {
+        var scannedFiles = {};
+        scanned[fk] = scannedFiles;
+        var level = 0, mapFile = fileMap[fk];
+        scannedFiles[fk] = {src: mapFile.src, level: level};
+
+        if (mapFile.deps) {
+          scan(mapFile, scannedFiles, level + 1);
+        }
+      }
+
+      var maxedLevelFiles = {}, levelMap = {}, levels = [];
+      _.forEach(scanned, function (scannedFiles, rootFile) {
+        _.forEach(scannedFiles, function (file, fileName) {
+          var mapFile = maxedLevelFiles[fileName];
+          if (!mapFile) {
+            maxedLevelFiles[fileName] = {src: file.src, level: file.level};
+          } else {
+            mapFile.level = Math.max(mapFile.level, file.level);
+          }
+        });
       });
 
-      grunt.log.writeln('Replaced ' + chalk.cyan(files.length) + ' ' +
-        (files.length === 1 ? 'reference' : 'references') + ' to assets'
-      );
-    });
+      _.forEach(maxedLevelFiles, function (mapFile, fileName) {
+        var levelFiles = levelMap[mapFile.level];
+        if (!levelFiles) {
+          levelFiles = levelMap[mapFile.level] = {};
+          levels.push(mapFile.level);
+        }
+        levelFiles[fileName] = mapFile;
+      });
+
+      var maxLevel = -1;
+      levels = _.sortBy(levels, function (n) {
+        maxLevel = Math.max(maxLevel, n);
+        return -n;
+      });
+
+      var revedFileMap = {};
+      _.forEach(levels, function (level) {
+        var levelFiles = levelMap[level];
+        if (maxLevel == level) {
+          _.forEach(levelFiles, function (file, fileName) {
+            var revedFile;
+            if (revFileMap[file.src]) {
+              revedFile = revFile(fileName);
+              revFileMap[file.src].revved = true;
+            } else {
+              revedFile = fileName;
+            }
+            revedFileMap[fileName] = revedFile;
+            replaceFile(revedFile);
+          });
+        } else {
+          _.forEach(levelFiles, function (file, fileName) {// reloace requires
+            replaceFile(fileName);
+          });
+          _.forEach(levelFiles, function (file, fileName) {
+            var revedFile;
+            if (revFileMap[file.src]) {
+              revedFile = revFile(fileName);
+              revFileMap[file.src].revved = true;
+            } else {
+              revedFile = fileName;
+            }
+            revedFileMap[fileName] = revedFile;
+            replaceFile(revedFile);
+          });
+        }
+      });
+
+      _.forEach(revFileMap, function (file, fileName) {
+        if (file.revved === false) {
+          revFile(fileName);
+          console.log('-----'+fileName);
+          file.revved = true;
+        }
+      });
+    } else {
+      getHandler.apply(this, [target]);
+
+      this.files.forEach(function (fileObj) {
+        var files = grunt.file.expand({
+          nonull: true,
+          filter: 'isFile'
+        }, fileObj.src);
+        files.forEach(function (filename) {
+          replaceFile(filename);
+        });
+        grunt.log.writeln('Replaced ' + chalk.cyan(files.length) + ' ' +
+          (files.length === 1 ? 'reference' : 'references') + ' to assets'
+        );
+      });
+    }
   });
 
   grunt.registerMultiTask('useminPrepare', 'Using HTML markup as the primary source of information', function () {
@@ -165,8 +362,8 @@ module.exports = function (grunt) {
     var flow = getFlowFromConfig(grunt.config('useminPrepare'), this.target);
 
     var c = new ConfigWriter(flow, {
-      root: root,
-      dest: dest,
+      root   : root,
+      dest   : dest,
       staging: staging
     });
 
