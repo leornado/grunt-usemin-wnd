@@ -130,13 +130,16 @@ module.exports = function (grunt) {
     var debug = require('debug')('usemin:usemin');
     var opts = {}, handlers = {}, revFileMap = {}, revs = this.options()['rev'];
 
-    var revFiles = grunt.file.expand({
-      nonull: true,
-      filter: 'isFile'
-    }, revs);
-    revFiles.forEach(function (revFile) {
-      revFileMap[revFile] = {revved: false};
-    });
+    var revFiles;
+    if (revs) {
+      revFiles = grunt.file.expand({
+        nonull: true,
+        filter: 'isFile'
+      }, revs);
+      revFiles.forEach(function (revFile) {
+        revFileMap[revFile] = {revved: false};
+      });
+    }
 
     var getHandler = function (target) {
       var options = opts[target] = this.options({
@@ -164,7 +167,7 @@ module.exports = function (grunt) {
       ext2type[type] = type;
     };
 
-    var replaceFile = function (filename) {
+    var replaceFile = function (filename, skipThisFile) {
       var suffix = filename.substr(filename.lastIndexOf('.') + 1);
       var type = ext2type[suffix];
       if (!type) {
@@ -177,7 +180,7 @@ module.exports = function (grunt) {
       grunt.verbose.writeln(chalk.bold('Processing as ' + options.type.toUpperCase() + ' - ') + chalk.cyan(filename));
 
       // Our revved version locator
-      var content = handlers[type].process(filename, options.assetsDirs);
+      var content = handlers[type].process(filename, options.assetsDirs, skipThisFile);
 
       // write the new content to disk
       grunt.file.write(filename, content);
@@ -209,7 +212,7 @@ module.exports = function (grunt) {
           });
         }
       }
-      var fileMap = {};
+      var fileMap = {}, depsFiles = {};
       for (var fk in dependencies) {
         var mapFile = fileMap[fk];
         if (!mapFile) mapFile = fileMap[fk] = {level: 0};
@@ -225,6 +228,7 @@ module.exports = function (grunt) {
             continue;
           }
 
+          depsFiles[fr] = true;
           var maprFile = fileMap[fr];
           if (!maprFile) maprFile = fileMap[fr] = {src: fdep.src, level: 0};
           else maprFile.src = fdep.src;
@@ -233,17 +237,21 @@ module.exports = function (grunt) {
         }
       }
 
+      var rootFileMap = {};
+      _.forEach(fileMap, function (file, fileName) {
+        if (!depsFiles[fileName]) {
+          rootFileMap[fileName] = true;
+        }
+      });
+
       var scanned = {};
       var scan = function (file, scannedFiles, level) {
-        var prefix = '';
-        for (var fi = 0; fi < level; fi++)
-          prefix += '  ';
         for (var fk in file.deps) {
           var mapFile = fileMap[fk], scannedFile = scannedFiles[fk];
           if (!scannedFile) {
             scannedFile = scannedFiles[fk] = {src: mapFile.src, level: level};
           } else {
-            scannedFile.level = level;
+            scannedFile.level += level;
             scannedFile.src = mapFile.src;
           }
 
@@ -252,27 +260,31 @@ module.exports = function (grunt) {
           }
         }
       };
-      for (var fk in fileMap) {
-        var scannedFiles = {};
-        scanned[fk] = scannedFiles;
-        var level = 0, mapFile = fileMap[fk];
-        scannedFiles[fk] = {src: mapFile.src, level: level};
+      for (var fk in rootFileMap) {
+        //var scannedFiles = {};
+        //scanned[fk] = scannedFiles;
+        var level = 0, mapFile = fileMap[fk], scannedFile = scanned[fk];
+        if (!scannedFile) {
+          scannedFile = scanned[fk] = {src: mapFile.src, level: level};
+        } else {
+          level = scannedFile.level;
+        }
 
         if (mapFile.deps) {
-          scan(mapFile, scannedFiles, level + 1);
+          scan(mapFile, scanned, level + 1);
         }
       }
 
       var maxedLevelFiles = {}, levelMap = {}, levels = [];
-      _.forEach(scanned, function (scannedFiles, rootFile) {
-        _.forEach(scannedFiles, function (file, fileName) {
-          var mapFile = maxedLevelFiles[fileName];
-          if (!mapFile) {
-            maxedLevelFiles[fileName] = {src: file.src, level: file.level};
-          } else {
-            mapFile.level = Math.max(mapFile.level, file.level);
-          }
-        });
+      _.forEach(scanned, function (file, fileName) {
+        //_.forEach(scannedFiles, function (file, fileName) {
+        var mapFile = maxedLevelFiles[fileName];
+        if (!mapFile) {
+          maxedLevelFiles[fileName] = {src: file.src, level: file.level};
+        } else {
+          mapFile.level = Math.max(mapFile.level, file.level);
+        }
+        //});
       });
 
       _.forEach(maxedLevelFiles, function (mapFile, fileName) {
@@ -284,6 +296,7 @@ module.exports = function (grunt) {
         levelFiles[fileName] = mapFile;
       });
 
+      //console.log(JSON.stringify(levelMap));
       var maxLevel = -1;
       levels = _.sortBy(levels, function (n) {
         maxLevel = Math.max(maxLevel, n);
@@ -307,7 +320,7 @@ module.exports = function (grunt) {
           });
         } else {
           _.forEach(levelFiles, function (file, fileName) {// reloace requires
-            replaceFile(fileName);
+            replaceFile(fileName, true);
           });
           _.forEach(levelFiles, function (file, fileName) {
             var revedFile;
@@ -323,13 +336,14 @@ module.exports = function (grunt) {
         }
       });
 
+      grunt.log.subhead('Start rev no deps files');
       _.forEach(revFileMap, function (file, fileName) {
         if (file.revved === false) {
           revFile(fileName);
-          console.log('-----'+fileName);
           file.revved = true;
         }
       });
+      grunt.log.subhead('Finish rev no deps files');
     } else {
       getHandler.apply(this, [target]);
 
