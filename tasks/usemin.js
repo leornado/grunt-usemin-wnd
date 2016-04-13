@@ -128,11 +128,12 @@ module.exports = function (grunt) {
 
   grunt.registerMultiTask('usemin', 'Replaces references to non-minified scripts / stylesheets', function () {
     var debug = require('debug')('usemin:usemin');
-    var opts = {}, handlers = {}, revFileMap = {}, revs = this.options()['rev'];
+    var defOpts = this.options(), revs = defOpts.rev, useRev = defOpts.useRev;
+    var target = this.target, ext2type = defOpts.ext2type || {};
 
-    var revFiles;
-    if (revs) {
-      revFiles = grunt.file.expand({
+    var opts = {}, handlers = {}, revFileMap = {};
+    if (target != 'files' || (useRev && revs)) {
+      var revFiles = grunt.file.expand({
         nonull: true,
         filter: 'isFile'
       }, revs);
@@ -186,7 +187,6 @@ module.exports = function (grunt) {
       grunt.file.write(filename, content);
     };
 
-    var target = this.target, defOpts = this.options(), ext2type = defOpts.ext2type || {};
     if (target == 'files') {
       var dependencies = {};
       for (var type in this.data) {
@@ -296,7 +296,6 @@ module.exports = function (grunt) {
         levelFiles[fileName] = mapFile;
       });
 
-      //console.log(JSON.stringify(levelMap));
       var maxLevel = -1;
       levels = _.sortBy(levels, function (n) {
         maxLevel = Math.max(maxLevel, n);
