@@ -1,6 +1,6 @@
 {
   "name": "grunt-usemin-wnd",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "license": "BSD-2-Clause",
   "author": "leornado",
   "description": "Modified by grunt-usemin 4 personal use.",
