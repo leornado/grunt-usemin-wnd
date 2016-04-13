@@ -215,7 +215,7 @@ module.exports = function (grunt) {
       var fileMap = {}, depsFiles = {};
       for (var fk in dependencies) {
         var mapFile = fileMap[fk];
-        if (!mapFile) mapFile = fileMap[fk] = {level: 0};
+        if (!mapFile) mapFile = fileMap[fk] = {src: fk, level: 0};
         var fdeps = dependencies[fk];
         if (!fdeps) continue;
 
